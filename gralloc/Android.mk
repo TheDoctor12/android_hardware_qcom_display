@@ -96,6 +96,7 @@ LOCAL_SHARED_LIBRARIES        := $(common_libs) \
                                   android.hardware.graphics.mapper@2.0 \
                                   android.hardware.graphics.mapper@2.1 \
                                   vendor.qti.hardware.display.mapperextensions@1.1 \
+                                  vendor.qti.hardware.display.mapperextensions@1.3 \
                                   android.hardware.graphics.mapper@3.0
 LOCAL_CFLAGS                  := $(common_flags) -DLOG_TAG=\"qdgralloc\" -Wno-sign-conversion \
                                  -D__QTI_DISPLAY_GRALLOC__
@@ -126,6 +127,7 @@ LOCAL_SHARED_LIBRARIES        := $(common_libs) \
                                   android.hardware.graphics.mapper@2.0 \
                                   android.hardware.graphics.mapper@2.1 \
                                   vendor.qti.hardware.display.mapperextensions@1.1 \
+                                  vendor.qti.hardware.display.mapperextensions@1.3 \
                                   android.hardware.graphics.mapper@3.0 \
                                   android.hardware.graphics.mapper@4.0
 LOCAL_CFLAGS                  := $(common_flags) $(qmaa_flags) -DLOG_TAG=\"qdgralloc\" -Wno-sign-conversion \
@@ -159,7 +161,8 @@ LOCAL_SHARED_LIBRARIES        := $(common_libs) \
                                  android.hardware.graphics.allocator@4.0 \
                                  android.hardware.graphics.allocator@3.0 \
                                  vendor.qti.hardware.display.mapperextensions@1.0 \
-                                 vendor.qti.hardware.display.mapperextensions@1.1
+                                 vendor.qti.hardware.display.mapperextensions@1.1 \
+                                 vendor.qti.hardware.display.mapperextensions@1.3
 LOCAL_CFLAGS                  := -DLOG_TAG=\"qdgralloc\" $(common_flags)
 ifneq ($(TARGET_USES_GRALLOC4),false)
 LOCAL_CFLAGS                  += -DTARGET_USES_GRALLOC4
