@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2019-2020 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2019 The Linux Foundation. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are
@@ -25,39 +25,6 @@
  * WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE
  * OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN
  * IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
- *
- * Changes from Qualcomm Innovation Center are provided under the following license:
- * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
- *
- * Redistribution and use in source and binary forms, with or without
- * modification, are permitted (subject to the limitations in the
- * disclaimer below) provided that the following conditions are met:
- *
- *     * Redistributions of source code must retain the above copyright
- *     notice, this list of conditions and the following disclaimer.
- *
- *     * Redistributions in binary form must reproduce the above
- *     copyright notice, this list of conditions and the following
- *     disclaimer in the documentation and/or other materials provided
- *     with the distribution.
- *
- *     * Neither the name of Qualcomm Innovation Center, Inc. nor the names of its
- *     contributors may be used to endorse or promote products derived
- *     from this software without specific prior written permission.
- *
- * NO EXPRESS OR IMPLIED LICENSES TO ANY PARTY'S PATENT RIGHTS ARE
- * GRANTED BY THIS LICENSE. THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT
- * HOLDERS AND CONTRIBUTORS "AS IS" AND ANY EXPRESS OR IMPLIED
- * WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF
- * MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED.
- * IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR
- * ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
- * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE
- * GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
- * INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER
- * IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR
- * OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN
- * IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
 #define ATRACE_TAG (ATRACE_TAG_GRAPHICS | ATRACE_TAG_HAL)
@@ -78,9 +45,7 @@ namespace implementation {
 
 using gralloc::BufferInfo;
 
-QtiMapperExtensions::QtiMapperExtensions() {
-  buf_mgr_ = BufferManager::GetInstance();
-}
+QtiMapperExtensions::QtiMapperExtensions() {}
 
 Return<void> QtiMapperExtensions::getMapSecureBufferFlag(void *buffer,
                                                          getMapSecureBufferFlag_cb hidl_cb) {
@@ -122,14 +87,8 @@ Return<void> QtiMapperExtensions::getCustomDimensions(void *buffer,
   if (buffer != nullptr && private_handle_t::validate(hnd) == 0) {
     stride = hnd->width;
     height = hnd->height;
-    int ret = gralloc::GetCustomDimensions(hnd, &stride, &height);
-    if (ret) {
-      ALOGW("%s: Error during GetCustomDimensions API call. "
-            "stride: %d, height: %d", __FUNCTION__, stride, height);
-      err = Error::BAD_BUFFER;
-    } else {
-      err = Error::NONE;
-    }
+    gralloc::GetCustomDimensions(hnd, &stride, &height);
+    err = Error::NONE;
   }
   hidl_cb(err, stride, height);
   return Void();
@@ -152,14 +111,10 @@ Return<void> QtiMapperExtensions::calculateBufferAttributes(int32_t width, int32
                                                             int32_t format, uint64_t usage,
                                                             calculateBufferAttributes_cb hidl_cb) {
   unsigned int alignedw, alignedh;
-  auto err = Error::NONE;
   BufferInfo info(width, height, format, usage);
-  int ret = gralloc::GetAlignedWidthAndHeight(info, &alignedw, &alignedh);
-  if (ret) {
-    err = Error::BAD_BUFFER;
-  }
+  gralloc::GetAlignedWidthAndHeight(info, &alignedw, &alignedh);
   bool ubwc_enabled = gralloc::IsUBwcEnabled(format, usage);
-  hidl_cb(err, alignedw, alignedh, ubwc_enabled);
+  hidl_cb(Error::NONE, alignedw, alignedh, ubwc_enabled);
   return Void();
 }
 
@@ -384,7 +339,6 @@ Return<void> QtiMapperExtensions::getSurfaceMetadata(void *buffer, getSurfaceMet
   return Void();
 }
 
-// It will return size for single layer only i.e. layer count is always 1.
 Return<void> QtiMapperExtensions::getFormatLayout(int32_t format, uint64_t usage, int32_t flags,
                                                   int32_t width, int32_t height,
                                                   getFormatLayout_cb hidl_cb) {
@@ -394,15 +348,11 @@ Return<void> QtiMapperExtensions::getFormatLayout(int32_t format, uint64_t usage
   hidl_vec<PlaneLayout> plane_info;
   unsigned int alignedw = 0, alignedh = 0;
   int plane_count = 0;
-  uint32_t size = 0;
+  uint64_t size = 0;
   int custom_format = gralloc::GetImplDefinedFormat(usage, format);
   BufferInfo info(width, height, custom_format, usage);
-  int ret = gralloc::GetBufferSizeAndDimensions(info, &size, &alignedw, &alignedh);
-  if (ret) {
-    err = Error::BAD_BUFFER;
-    hidl_cb(err, size, plane_info);
-    return Void();
-  }
+  gralloc::GetAlignedWidthAndHeight(info, &alignedw, &alignedh);
+  size = gralloc::GetSize(info, alignedw, alignedh);
   gralloc::PlaneLayoutInfo plane_layout[8] = {};
   ALOGD_IF(DEBUG, "%s: Aligned width and height - wxh: %ux%u custom_format = %d", __FUNCTION__,
            alignedw, alignedh, custom_format);
@@ -458,120 +408,6 @@ Return<Error> QtiMapperExtensions::getSurfaceMetadata_V1(void *buffer, void *met
   return err;
 }
 
-Return<void> QtiMapperExtensions::getMetadataFd(void *buffer, getFd_cb hidl_cb) {
-  auto err = Error::BAD_BUFFER;
-  int fd = 0;
-  auto hnd = static_cast<private_handle_t *>(buffer);
-  if (buffer != nullptr && private_handle_t::validate(hnd) == 0) {
-    err = Error::NONE;
-    fd = hnd->fd_metadata;
-  } else {
-    ALOGE("%s: buffer pointer: %p ", __FUNCTION__, buffer);
-  }
-  hidl_cb(err, fd);
-  return Void();
-}
-
-Return<void> QtiMapperExtensions::getMetadataSize(void *buffer, getSize_cb hidl_cb) {
-  auto err = Error::BAD_BUFFER;
-  unsigned int size = 0;
-  auto hnd = static_cast<private_handle_t *>(buffer);
-  if (buffer != nullptr && private_handle_t::validate(hnd) == 0) {
-    err = Error::NONE;
-    size = sizeof(MetaData_t);
-  }
-  hidl_cb(err, size);
-  return Void();
-}
-
-Return<void> QtiMapperExtensions::getCRCBufferOffset(void *buffer, getOffset_cb hidl_cb) {
-  auto err = Error::BAD_BUFFER;
-  unsigned int offset = 0;
-  auto hnd = static_cast<private_handle_t *>(buffer);
-  if (buffer != nullptr && private_handle_t::validate(hnd) == 0) {
-    err = Error::NONE;
-    offset = offsetof(MetaData_t, crcBuffer);
-  }
-  hidl_cb(err, offset);
-  return Void();
-}
-
-Return<Error> QtiMapperExtensions::getCRCBufferData(void *buffer, void *data) {
-  auto err = Error::BAD_BUFFER;
-  auto hnd = static_cast<private_handle_t *>(buffer);
-  if (data != nullptr && buffer != nullptr && private_handle_t::validate(hnd) == 0) {
-    if (getMetaData(hnd, GET_CRC_BUFFER, data) == 0) {
-      err = Error::NONE;
-    } else {
-      err = Error::UNSUPPORTED;
-    }
-  } else {
-    ALOGE("%s: buffer pointer: %p, data pointer: %p ", __FUNCTION__, buffer, data);
-  }
-  return err;
-}
-
-Return<Error> QtiMapperExtensions::copyMetaData(void *src, void *dst) {
-  auto error = Error::BAD_BUFFER;
-  auto src_hnd = static_cast<private_handle_t *>(src);
-  auto dst_hnd = static_cast<private_handle_t *>(dst);
-  if (src != nullptr && dst != nullptr && private_handle_t::validate(src_hnd) == 0 &&
-      private_handle_t::validate(dst_hnd) == 0) {
-    if (static_cast<IMapperExtensions_1_0_Error>(buf_mgr_->IsBufferImported(src_hnd)) ==
-            Error::NONE &&
-        static_cast<IMapperExtensions_1_0_Error>(buf_mgr_->IsBufferImported(dst_hnd)) ==
-            Error::NONE) {
-      MetaData_t *src_data = reinterpret_cast<MetaData_t *>(src_hnd->base_metadata);
-      MetaData_t *dst_data = reinterpret_cast<MetaData_t *>(dst_hnd->base_metadata);
-      *dst_data = *src_data;
-      error = Error::NONE;
-    }
-  } else {
-    ALOGE("%s: Copy Failed - src buffer: %p, dst buffer: %p", __FUNCTION__, src, dst);
-  }
-  return error;
-}
-
-Return<Error> QtiMapperExtensions::setMetadataBlob(const hidl_vec<uint8_t> &src, void *dst) {
-  auto error = Error::BAD_BUFFER;
-  if (src.data() == nullptr) {
-    return error;
-  }
-  auto dst_hnd = static_cast<private_handle_t *>(dst);
-  if (dst != nullptr && private_handle_t::validate(dst_hnd) == 0) {
-    if (static_cast<IMapperExtensions_1_0_Error>(buf_mgr_->IsBufferImported(dst_hnd)) ==
-        Error::NONE) {
-      const MetaData_t *src_data = reinterpret_cast<const MetaData_t *>(src.data());
-      MetaData_t *dst_data = reinterpret_cast<MetaData_t *>(dst_hnd->base_metadata);
-      *dst_data = *src_data;
-      error = Error::NONE;
-    }
-  } else {
-    ALOGE("%s: Copy Failed - src buffer: %p, dst pointer: %p", __FUNCTION__, src.data(), dst);
-  }
-  return error;
-}
-
-Return<void> QtiMapperExtensions::getMetadataBlob(void *src, getMetadataBlob_cb _hidl_cb) {
-  auto error = Error::BAD_BUFFER;
-  hidl_vec<uint8_t> out;
-  auto src_hnd = static_cast<private_handle_t *>(src);
-  out.resize(src_hnd->size);
-  if (src != nullptr && private_handle_t::validate(src_hnd) == 0) {
-    if (static_cast<IMapperExtensions_1_0_Error>(buf_mgr_->IsBufferImported(src_hnd)) ==
-        Error::NONE) {
-      MetaData_t *src_data = reinterpret_cast<MetaData_t *>(src_hnd->base_metadata);
-      MetaData_t *dst_data = reinterpret_cast<MetaData_t *>(out.data());
-      *dst_data = *src_data;
-      error = Error::NONE;
-      _hidl_cb(error, out);
-    }
-  } else {
-    ALOGE("%s: Get Failed - src buffer: %p", __FUNCTION__, src);
-  }
-  _hidl_cb(error, out);
-  return Void();
-}
 }  // namespace implementation
 }  // namespace V1_1
 }  // namespace mapperextensions
